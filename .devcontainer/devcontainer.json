@@ -1,0 +1,65 @@
+{
+  "name": "Docker-in-Docker Template",
+
+  "image": "ghcr.io/stratakit/devcontainer:latest",
+
+  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "esbenp.prettier-vscode",
+        "GitHub.copilot",
+        "usernamehw.errorlens",
+        "christian-kohler.path-intellisense",
+        "streetsidesoftware.code-spell-checker",
+        "mikestead.dotenv",
+        "yoavbls.pretty-ts-errors",
+        "antfu.iconify",
+        "ms-azuretools.vscode-docker"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "terminal.integrated.profiles.linux": {
+          "bash": { "path": "/bin/bash", "icon": "terminal-bash" },
+          "zsh": { "path": "/bin/zsh", "icon": "terminal" }
+        },
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "files.eol": "\n",
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true,
+        "[typescript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+        "[typescriptreact]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[json]": { "editor.defaultFormatter": "esbenp.prettier-vscode" }
+      }
+    }
+  },
+
+  "otherPortsAttributes": { "onAutoForward": "silent" },
+
+  "onCreateCommand": "bash .devcontainer/on-create.sh",
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+
+  "remoteUser": "vscode",
+
+  "remoteEnv": {
+    "NODE_ENV": "development",
+    "PNPM_HOME": "/home/vscode/.local/share/pnpm",
+    "PATH": "/home/vscode/.local/bin:/home/vscode/.opencode/bin:/home/vscode/.bun/bin:/home/vscode/.local/share/pnpm:${containerEnv:PATH}",
+    "HISTFILE": "/commandhistory/.bash_history",
+    "EDITOR": "code --wait",
+    "SHELL": "/bin/zsh"
+  },
+
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "4gb",
+    "storage": "32gb"
+  },
+
+  "shutdownAction": "stopContainer"
+}

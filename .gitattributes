@@ -1,0 +1,46 @@
+# Normalize line endings — every text file is LF in the index.
+# Windows checkouts stay LF (no autocrlf mangling); `core.autocrlf=input`
+# is the recommended setting for contributors on any platform.
+
+# Default: text files use LF; enforce on checkout.
+*                 text=auto eol=lf
+
+# Explicit overrides for generated or platform-specific files.
+
+# Action YAML + GitHub/Azure workflow YAML must stay LF so YAML
+# parsers and Azure DevOps accept them on Windows agents.
+*.yml             text eol=lf
+*.yaml            text eol=lf
+
+# Shell + JavaScript-family scripts must stay executable and LF.
+*.sh              text eol=lf
+*.bash            text eol=lf
+*.js              text eol=lf
+*.cjs             text eol=lf
+*.mjs             text eol=lf
+*.ts              text eol=lf
+*.mts             text eol=lf
+
+# Docs + JSON + lockfiles stay LF.
+*.md              text eol=lf
+*.json            text eol=lf
+*.lock            text eol=lf
+
+# Python
+*.py              text eol=lf
+
+# Dotfiles that shell tooling reads stay LF.
+.gitignore        text eol=lf
+.gitattributes    text eol=lf
+.env*             text eol=lf
+
+# Binary blobs: images, archives, fixtures that shouldn't be touched.
+*.png             binary
+*.jpg             binary
+*.jpeg            binary
+*.gif             binary
+*.ico             binary
+*.zip             binary
+*.tar             binary
+*.gz              binary
+*.pdf             binary

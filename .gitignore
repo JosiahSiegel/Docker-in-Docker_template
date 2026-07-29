@@ -1,0 +1,31 @@
+# Template repo root .gitignore.
+#
+# This file only governs THIS repository (the devcontainer template).
+# It does NOT affect any consumer repo that bind-mounts into /workspace —
+# consumer repos bring their own .gitignore.
+#
+# Keep this minimal. Anything project-specific (Node, Python, Next.js, etc.)
+# belongs in the consumer repo, not here.
+
+# Runtime artifacts created inside the container.
+.omo/
+.codegraph/
+
+# Editor / OS junk (defensive; the template repo should never contain these).
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.swp
+*.swo
+*~
+
+# Allow per-user local overrides of devcontainer scripts without committing them.
+.devcontainer/*.local.*
+.devcontainer/local-*
+
+# Local secrets just in case someone drops them here.
+.env
+.env.*
+!.env.example
