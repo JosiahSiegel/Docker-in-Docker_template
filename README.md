@@ -33,7 +33,7 @@ The devcontainer is just a Linux shell with your toolchains pre-installed. **One
 
 **Important:** because this image runs Docker-in-Docker, the **container** has its own filesystem and the host is **not** reachable from inside the container via `/mnt/...` or any other path. Host paths only enter the container through the explicit `mounts` entries below — that's how Dev Containers wires bind mounts across the DinD boundary.
 
-That said, the `source=...` part of each mount line is interpreted **by the Docker daemon on the host**, not by the container. On plain Docker-in-WSL2, the daemon is a Linux process inside your WSL distro and _can_ see `/mnt/d/...` — that's the path it binds from. On Docker Desktop, the daemon lives in a separate WSL distro and likewise sees `/mnt/d/...`. The container never sees `/mnt`; it only ever sees the `target=` path you choose (e.g. `/workspaces/umactually`).
+That said, the `source=...` part of each mount line is interpreted **by the Docker daemon on the host**, not by the container. On plain Docker-in-WSL2, the daemon is a Linux process inside your WSL distro and only sees real Linux paths — `/mnt/d/...` for Windows drives. On Docker Desktop, the daemon lives in a separate WSL distro and understands the WSL automount form directly — `/d/...` for Windows drives. The container never sees any of this; it only ever sees the `target=` path you choose (e.g. `/workspaces/myrepo`).
 
 **1. Declare the host repos you want in `.devcontainer/devcontainer.json`:**
 
@@ -42,28 +42,37 @@ That said, the `source=...` part of each mount line is interpreted **by the Dock
   "image": "ghcr.io/stratakit/devcontainer:latest",
   "mounts": [
     "source=${localEnv:HOME}/code/repo-one,target=/workspaces/repo-one,type=bind,consistency=cached",
-    "source=/mnt/d/repos/umactually,target=/workspaces/umactually,type=bind,consistency=cached",
+
+    // Docker Desktop (WSL2 backend) — use the WSL automount form:
+    "source=/d/repos/myrepo,target=/workspaces/myrepo,type=bind,consistency=cached",
+
+    // Plain Docker-in-WSL — use the /mnt/d/... form (the daemon can't resolve /d/...):
+    // "source=/mnt/d/repos/myrepo,target=/workspaces/myrepo,type=bind,consistency=cached",
   ],
 }
 ```
 
 - The `source` can be any host path — anywhere Docker can bind-mount from. The paths above sit under `$HOME` (the common case), but `~/projects/somewhere/deep/repo-three` shows you can nest as deep as you need under `HOME`. Anything under `${localEnv:HOME}` is portable across hosts and users.
 - For repos **outside** `$HOME`, use an absolute path — but **the form of the path must match what the Docker daemon sees on the host**, not what your shell sees. The container itself never sees any of these paths; it only ever sees the `target=` path you assign. Common footguns:
-  - **WSL2 + plain Docker Engine in your distro** (the daemon is in your default WSL distro): use the Linux path the daemon can read, e.g. `/mnt/d/repos/umactually`. Windows-style drive letters like `/d/repos/umactually` only exist because WSL's `automount` synthesises them inside your shell — they aren't real Linux paths, and some Docker versions try to "fix" them to `/mnt/d/...` which then fails. Pass the `/mnt/...` form directly.
-  - **WSL2 + Docker Desktop** (daemon lives in the hidden `docker-desktop` WSL distro): same rule — use `/mnt/d/repos/umactually`. The daemon mounts your distro's filesystem in, so `/mnt/...` is what it actually sees.
+  - **WSL2 + plain Docker Engine in your distro** (the daemon is in your default WSL distro): use the Linux path the daemon can read, e.g. `/mnt/d/repos/myrepo`. Windows-style drive letters like `/d/repos/myrepo` only exist because WSL's `automount` synthesises them inside your shell — they aren't real Linux paths to the daemon, so the bind will fail. Pass the `/mnt/...` form directly.
+  - **WSL2 + Docker Desktop** (daemon lives in the hidden `docker-desktop` WSL distro): use the WSL-style path, e.g. `/d/repos/myrepo`. Docker Desktop understands the WSL automount form (`/d/...`) directly here — it's the path the daemon actually sees for your Windows drives, and is shorter to type than the `/mnt/d/...` equivalent.
   - **VS Code on Windows, Docker Desktop on Windows** (no WSL): use the Windows path, e.g. `C:\Users\you\elsewhere\repo-four`, or any drive letter like `D:\repos\repo-four`.
   - **macOS Docker Desktop**: `/Users/you/elsewhere/repo-four` or `/Volumes/external/repo-four`.
   - **Linux, native Docker**: any absolute path the daemon can read, e.g. `/srv/repos/repo-four`.
 
-  Quick sanity check — run on the host (in WSL if you're in WSL). This exercises the daemon's view of the path, exactly like the devcontainer's bind mount will:
+  Quick sanity check — run on the host (in WSL if you're in WSL). This exercises the daemon's view of the path, exactly like the devcontainer's bind mount will. Pick the form that matches your setup:
 
   ```bash
-  docker run --rm -v /mnt/d/repos/umactually:/test alpine test -d /test && echo OK
+  # Docker Desktop (WSL2 backend):
+  docker run --rm -v /d/repos/myrepo:/test alpine test -d /test && echo OK
+
+  # Plain Docker-in-WSL:
+  # docker run --rm -v /mnt/d/repos/myrepo:/test alpine test -d /test && echo OK
   ```
 
   If that prints `OK`, the path is bindable; if it errors, the daemon can't see that exact path and the bind-mount in your devcontainer will fail the same way.
 
-  > **Heads-up on `/d/...` vs `/mnt/d/...`:** some Docker versions silently rewrite `/d/...` to `/mnt/d/...` for you. That's convenient on Docker Desktop and broken on plain Docker-in-WSL — so always write the explicit `/mnt/d/...` form to make it portable and avoid the surprise.
+  > **Heads-up on `/d/...` vs `/mnt/d/...`:** they are **not** interchangeable. On **Docker Desktop** (WSL2 backend), use `/d/repos/...` — the daemon understands the WSL automount form and that's what it binds from. On **plain Docker-in-WSL**, use `/mnt/d/repos/...` — the `/d/...` form is just a shell-level symlink that the daemon can't resolve, and the bind will fail. Pick the form that matches your setup above.
 
 - `${localEnv:HOME}` is resolved by Dev Containers on the **host** before the bind is created, so the resulting `source` is a real host path. The `target` is the in-container path you'll use inside the devcontainer.
 - `type=bind,consistency=cached` is the standard recipe on Docker Desktop / WSL2. Drop `,consistency=cached` on native Linux.
