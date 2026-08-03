@@ -88,6 +88,46 @@ That's it. Edits on either side hit the same files; no clones, no `.devcontainer
 
 If you want each project in its **own** devcontainer (truly isolated, separate processes/ports/state per repo), the Dev Containers extension can do that — but every repo needs its own `devcontainer.json` pointing at the image. Skip this unless you specifically need isolation; Option B is almost always the right answer.
 
+## Installing on a Windows host
+
+If you want the same opencode + omo configuration on a bare **Windows host** (no WSL, no devcontainer — running `opencode` directly on Windows), use the bundled PowerShell installer. It pulls the same gist the devcontainer's `post-create.sh` uses, and writes the same files into `%USERPROFILE%`.
+
+**Prerequisites:**
+
+- **PowerShell 7+** (`pwsh`). Windows PowerShell 5.1 (the default on Windows 10) is not supported. Install with `winget install Microsoft.PowerShell` or from <https://github.com/PowerShell/PowerShell/releases>.
+- **git** (recommended) or curl.exe (Windows 10 1803+ ships it; or bundled with `git for Windows`). The script falls back to `Invoke-WebRequest` if neither is installed.
+- A `.env` file with `OPENCODE_BASE_URL` and `OPENCODE_API_KEY` (see [Configuration](#configuration) below for the search order).
+
+**Run it:**
+
+```powershell
+# From a clone of this template, or any directory that has the .devcontainer folder:
+pwsh -ExecutionPolicy Bypass -File .\.devcontainer\omo-installer-win-host.ps1
+
+# If substitution fails silently, add -ShowDetails to see the actual jq error
+# and a file-lock diagnostic (OneDrive sync, antivirus, or a running opencode
+# process are the usual suspects):
+pwsh -ExecutionPolicy Bypass -File .\.devcontainer\omo-installer-win-host.ps1 -ShowDetails
+```
+
+The installer is idempotent — re-running it purges old variants and re-installs the current gist contents. It does **not** modify the registry, environment variables, or anything outside `%USERPROFILE%`.
+
+**What it installs:**
+
+| File                                                | Purpose                                          |
+| --------------------------------------------------- | ------------------------------------------------ |
+| `%USERPROFILE%\.config\opencode\opencode.json`      | opencode config (provider, model list, plugins)  |
+| `%USERPROFILE%\.local\share\opencode\auth.json`     | opencode auth (your LLM API key)                 |
+| `%USERPROFILE%\.omo\omo.json`                       | omo category/agent/team configuration            |
+
+After install, run `opencode` from PowerShell or CMD. To uninstall, just delete those three directories.
+
+**Differences from the devcontainer install:**
+
+- The Windows installer does **not** create a devcontainer — it only configures opencode. If you want the full toolchain (node, bun, gh, etc.), use the devcontainer (Options A/B above).
+- Substitutions are the same: `$env:OPENCODE_BASE_URL` and `$env:OPENCODE_API_KEY` in a `.env` (search order matches the bash installer exactly).
+- The installer does **not** run on every shell start; re-run it manually if you change the gist.
+
 ## Configuration
 
 ### `.env` for the agent runtime
@@ -124,14 +164,16 @@ Run `lazydocker` from WSL; it'll talk to the host Docker daemon and show the dev
 
 ## Lifecycle scripts
 
-Both scripts are environment-only — they write to `$HOME`, never to `/workspace`.
+Container-side scripts (run inside the devcontainer) are environment-only — they write to `$HOME`, never to `/workspace`.
 
-| Script           | Runs                        | Purpose                                                                  |
-| ---------------- | --------------------------- | ------------------------------------------------------------------------ |
-| `on-create.sh`   | Once, on container creation | Git config, SSH/Claude credential checks, `safe.directory=/workspace`    |
-| `post-create.sh` | Once after `on-create`      | Install `oh-my-opencode`, bootstrap opencode config from the public gist |
+| Script                            | Runs                        | Purpose                                                                  |
+| --------------------------------- | --------------------------- | ------------------------------------------------------------------------ |
+| `on-create.sh`                    | Once, on container creation | Git config, SSH/Claude credential checks, `safe.directory=/workspace`    |
+| `post-create.sh`                  | Once after `on-create`      | Install `oh-my-opencode`, bootstrap opencode config from the public gist |
+| `omo-installer.sh`                | Manual (any time)           | Re-run the devcontainer-side install (purge + reinstall from gist)       |
+| `omo-installer-win-host.ps1`      | Manual, on a Windows host   | Windows host install — same gist, no devcontainer required               |
 
-Anything that should run on every container start belongs in the image itself (a `Dockerfile` layer), not in a lifecycle hook.
+`omo-installer.sh` and `omo-installer-win-host.ps1` are paired: the `.sh` runs in a Linux devcontainer, the `.ps1` runs on a bare Windows host. They both pull the same gist and produce the same three config files. Anything that should run on every container start belongs in the image itself (a `Dockerfile` layer), not in a lifecycle hook.
 
 ## Updating the image
 
