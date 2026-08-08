@@ -32,4 +32,7 @@ bash "${SCRIPT_DIR}/omo-installer.sh" \
 bash "${SCRIPT_DIR}/git-config-from-env.sh" \
     || echo "WARN: git-config-from-env.sh failed (continuing)" >&2
 
+# Bootstrap OpenChamber into the container's $HOME.
+curl -fsSL https://raw.githubusercontent.com/openchamber/openchamber/main/scripts/install.sh | bash
+
 echo "==> post-create: done"
