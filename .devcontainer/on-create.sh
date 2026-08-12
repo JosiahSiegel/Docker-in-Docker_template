@@ -43,4 +43,20 @@ git config --global init.defaultBranch main
 git config --global pull.rebase false
 git config --global safe.directory /workspace
 
+# ============================================
+# NODE.JS — ensure v22+ (required by OpenChamber)
+# ============================================
+echo "Ensuring Node.js 22+..."
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+if ! command -v nvm >/dev/null 2>&1; then
+    curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+fi
+# Always (re)source — non-interactive shells don't load ~/.bashrc where nvm
+# normally gets sourced, so nvm won't be a function even after install above.
+# shellcheck disable=SC1091
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+nvm install 22
+nvm alias default 22
+echo "Node.js $(node -v) active"
+
 echo "On-create setup complete."
