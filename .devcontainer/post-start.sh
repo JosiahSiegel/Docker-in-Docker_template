@@ -26,7 +26,13 @@ rm -f "$PIDFILE"
 # Without it the CLI spawns a detached child and uses an IPC channel to signal
 # "ready"; when nohup backgrounds the CLI and this script exits, the IPC pipe
 # closes before the child can send, causing an EPIPE crash on startup.
-nohup openchamber --foreground --port 4098 >"$LOG" 2>&1 &
+#
+# setsid + </dev/null are required under postStartCommand: Dev Containers tears
+# down the lifecycle shell's session once the script exits, killing everything
+# still in that session/process group (nohup only shields SIGHUP, not the
+# group/session kill). setsid puts openchamber in its own session so it
+# survives; </dev/null detaches stdin from the lifecycle runner's pipe.
+setsid nohup openchamber --foreground --port 4098 </dev/null >"$LOG" 2>&1 &
 PID=$!
 echo "$PID" > "$PIDFILE"
 
