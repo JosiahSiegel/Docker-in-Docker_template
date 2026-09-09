@@ -330,15 +330,17 @@ function Get-GistFiles {
         }
     }
 
-    # Parse with jq if available, else PowerShell.
-    $jq = Get-Command jq -ErrorAction SilentlyContinue
-    if ($jq) {
-        $namesAndUrls = $body | & $jq -r '.files | to_entries[] | "\(.value.filename)\t\(.value.raw_url)"'
-    } else {
-        $namesAndUrls = $body | ConvertFrom-Json | ForEach-Object {
-            $_.files.PSObject.Properties | ForEach-Object {
-                "$($_.Value.filename)`t$($_.Value.raw_url)"
-            }
+    # Parse the API response with PowerShell. The earlier $jq branch was
+    # removed because Windows' ProcessStartInfo.Arguments splits on spaces
+    # and strips the outer quotes before they reach jq, which turns a
+    # well-formed filter such as '.files | to_entries[] | "\(.value.filename)
+    # \t\(.value.raw_url)"' into an invalid program on jq -- the parser
+    # reports "unexpected INVALID_CHARACTER (Unix shell quoting issues?)"
+    # for any '\' or '\t' in the string interpolation. The PowerShell path
+    # below needs no external process and avoids every quoting landmine.
+    $namesAndUrls = $body | ConvertFrom-Json | ForEach-Object {
+        $_.files.PSObject.Properties | ForEach-Object {
+            "$($_.Value.filename)`t$($_.Value.raw_url)"
         }
     }
 
