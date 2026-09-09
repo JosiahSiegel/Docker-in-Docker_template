@@ -52,6 +52,13 @@ installer URL so a fetched standalone copy remains usable.
 Optional expected SHA-256 for the installer. When supplied, the local or
 downloaded installer must match before execution.
 
+.PARAMETER OpenCodePath
+Optional path to the OpenCode executable or shim used for analysis and plugin
+refresh. If omitted, opencode is discovered on PATH. OpenChamber Desktop may
+bundle it under:
+%LOCALAPPDATA%\Programs\OpenChamber\resources\opencode-cli\opencode.exe
+The installation path may vary.
+
 .PARAMETER OpenChamberPath
 Optional path to OpenChamber.exe. If omitted, command discovery is used.
 
@@ -70,6 +77,11 @@ pwsh -ExecutionPolicy Bypass -File '.\omo-repair-win-host.ps1'
 .EXAMPLE
 # Preview a targeted plugin refresh; no changes are made:
 pwsh -ExecutionPolicy Bypass -File '.\omo-repair-win-host.ps1' -Repair -RefreshPlugin -StopProcesses -WhatIf
+
+.EXAMPLE
+# Use OpenChamber Desktop's bundled OpenCode sidecar (installation path may vary):
+$bundledOpenCode = Join-Path $env:LOCALAPPDATA 'Programs\OpenChamber\resources\opencode-cli\opencode.exe'
+pwsh -ExecutionPolicy Bypass -File '.\omo-repair-win-host.ps1' -OpenCodePath $bundledOpenCode -Repair -RefreshPlugin -StopProcesses
 
 .EXAMPLE
 # Refresh config with the installer beside this script, refresh the plugin, and restart OpenChamber:
@@ -95,6 +107,7 @@ param(
     [string]$InstallerUrl = 'https://raw.githubusercontent.com/JosiahSiegel/Docker-in-Docker_template/main/.devcontainer/omo-installer-win-host.ps1',
     [ValidatePattern('^[A-Fa-f0-9]{64}$')]
     [string]$InstallerSha256,
+    [string]$OpenCodePath,
     [string]$OpenChamberPath,
     [switch]$StartOpenChamber,
     [switch]$Json
@@ -528,7 +541,7 @@ function Get-Analysis {
     )
 
     $installedPackageJson = Join-Path (Join-Path $CacheSlot.slot 'node_modules') (Join-Path $PackageName 'package.json')
-    $opencodeCommand = Get-CommandInspection -Name 'opencode'
+    $opencodeCommand = Get-CommandInspection -Name 'opencode' -ExplicitPath $OpenCodePath
     $npmCommand = Get-CommandInspection -Name 'npm'
     $openChamberCommand = Get-CommandInspection -Name 'OpenChamber.exe' -ExplicitPath $OpenChamberPath -RequireExactExeName
     $installed = Get-JsonFileVersion -Path $installedPackageJson
@@ -730,6 +743,15 @@ function Stop-RelevantProcesses {
                     continue
                 }
 
+                $currentImageName = if ($currentProcess.Name.EndsWith('.exe', [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $currentProcess.Name
+                } else {
+                    "$($currentProcess.Name).exe"
+                }
+                if ($currentImageName -ine $target.name) {
+                    throw "Refusing to stop PID $($target.id): snapshot expected '$($target.name)', but the current image is '$currentImageName'. The PID may have been reused."
+                }
+
                 Stop-Process -Id $target.id -ErrorAction Stop
                 Wait-Process -Id $target.id -Timeout 15 -ErrorAction SilentlyContinue
                 if ($null -ne (Get-Process -Id $target.id -ErrorAction SilentlyContinue)) {
@@ -773,7 +795,8 @@ function Invoke-PluginRefresh {
     )
 
     if (-not $OpenCodeCommand.available) {
-        throw 'Cannot refresh the plugin because the opencode executable is unavailable.'
+        $reason = if ($OpenCodeCommand.validationError) { " $($OpenCodeCommand.validationError)" } else { '' }
+        throw "Cannot refresh the plugin because the selected OpenCode executable is unavailable.$reason Pass -OpenCodePath with an existing executable or shim, or add opencode to PATH."
     }
 
     if (Test-Path -LiteralPath $CacheSlot.slot) {
