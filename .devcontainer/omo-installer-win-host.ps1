@@ -268,11 +268,17 @@ function Get-GistFiles {
         try {
             & $git clone --depth 1 --quiet "https://gist.github.com/$GistId.git" $repo 2>&1 | Out-Null
             if ($LASTEXITCODE -eq 0) {
-                # Newline-separated, raw paths. The gist filenames here use
-                # backslashes as directory separators, so a path like
-                # ".omo\omo.json" is one line; split on newline to enumerate.
-                $raw = & $git -C $repo -c core.quotePath=false ls-files
-                $names = $raw -split "`r?`n" | Where-Object { $_ -ne '' }
+                # Use `git ls-files -z` so each filename is NUL-terminated with
+                # no quoting, escaping, or trailing newline. `-z` is required
+                # because gist filenames contain literal backslashes (the gist
+                # author uses ".config\opencode\opencode.json" as a single
+                # filename, where '\' is part of the name, NOT a separator
+                # from git's perspective). With `-z` there are no surrounding
+                # quotes to strip and no confusion with `core.quotePath`,
+                # which does NOT cover backslash escaping.
+                # Convert NUL to LF so PowerShell's -split can handle it.
+                $raw = & $git -C $repo ls-files -z
+                $names = $raw -split "`0" | Where-Object { $_ -ne '' }
                 $out = foreach ($n in $names) {
                     [pscustomobject]@{ Name = $n; Source = (Join-Path $repo $n) }
                 }

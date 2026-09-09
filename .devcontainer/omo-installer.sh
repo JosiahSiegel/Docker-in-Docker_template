@@ -122,12 +122,15 @@ enumerate() {
   # work for a public gist without any credentials.
   if command -v git >/dev/null 2>&1; then
     if git clone --depth 1 --quiet "https://gist.github.com/$GIST_ID.git" "$repo" 2>/dev/null; then
-      # -c core.quotePath=false  -> emit raw paths, no double-quote wrapping
-      #                            (the default wraps paths with backslashes
-      #                            or non-ASCII bytes in "..." with \\ etc.)
-      # -z                       -> NUL-terminated, so paths with newlines
-      #                            (rare but possible) still parse cleanly.
-      git -C "$repo" -c core.quotePath=false ls-files -z | \
+      # `-z` -> NUL-terminated, byte-exact filenames with no escaping.
+      # This matters here because the gist filenames contain literal
+      # backslashes (".config\opencode\opencode.json") -- a single literal
+      # filename, NOT a path with separators from git's perspective. With
+      # `ls-files` line output (no `-z`), git wraps every backslash-bearing
+      # filename in surrounding double-quotes and escapes the backslashes,
+      # which we then have to unescape. With `-z`, no escaping happens and
+      # the names round-trip verbatim.
+      git -C "$repo" ls-files -z | \
         while IFS= read -r -d '' filename; do
           [ -z "$filename" ] && continue
           printf '%s\t%s\n' "$filename" "$repo/$filename"
