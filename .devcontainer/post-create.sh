@@ -47,4 +47,19 @@ bash "${SCRIPT_DIR}/git-config-from-env.sh" \
 # Bootstrap OpenChamber into the container's $HOME.
 curl -fsSL https://raw.githubusercontent.com/openchamber/openchamber/main/scripts/install.sh | bash
 
+# Patch OpenChamber's agent-tool plugin generator: use additionalProperties:true
+# instead of false in the generated tool schemas. Manifest's deep tier silently
+# rejects tool schemas with additionalProperties:false + scalar properties
+# (returns 200 with finish_reason:"length" and 0 usage), which broke all
+# Prometheus/deep sessions. This patch survives OpenChamber restarts because
+# the generator template is patched, not the generated output file.
+OPENCHAMBER_RUNTIME="$HOME/.local/share/pnpm/global/5/node_modules/@openchamber/web/server/lib/agent-tool/runtime.js"
+if [ -f "$OPENCHAMBER_RUNTIME" ]; then
+    sed -i 's/additionalProperties: false/additionalProperties: true/g' "$OPENCHAMBER_RUNTIME" \
+        && echo "  patched openchamber agent-tool runtime (additionalProperties: true)" \
+        || echo "WARN: failed to patch openchamber agent-tool runtime" >&2
+else
+    echo "WARN: openchamber agent-tool runtime not found at $OPENCHAMBER_RUNTIME (install may have moved it)" >&2
+fi
+
 echo "==> post-create: done"
